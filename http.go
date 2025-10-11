@@ -43,6 +43,9 @@ func (h Header) Get(key string) []string {
 }
 
 func (h Header) Add(key string, value string) {
+	if h == nil {
+		h = make(map[string][]string)
+	}
 	h[key] = append(h[key], value)
 }
 
@@ -106,7 +109,47 @@ func WriteRequest(method int, location string, header Header) []byte {
 
 // Reads the response received from the Server
 // Client side code
-func ReadResponse() {}
+func ReadResponse(response []byte) (ResponseBody, Header, HTTPStatus) {
+	// Header and body seperated by \n so a \n\n sequence indicates end of headers
+	strResponse := string(response)
+	parts := strings.Split(strResponse, "\n\n")
+	headersField, body := parts[0], []byte(parts[1])
+	var status HTTPStatus
+	var headers Header
+	for i, line := range strings.Split(headersField, "\n") {
+		if i == 0 {
+			components := strings.Split(line, " ")
+			if components[0] != "HTTP/1.1" {
+				log.Fatal("Bad Response 1")
+			}
+
+			if code, err := strconv.Atoi(components[1]); err == nil {
+				status.Code = code
+			} else {
+				log.Fatal("Bad Response 2")
+			}
+
+			if codeNum := status.Text(); codeNum != components[2] {
+				log.Fatal("Bad Response 3")
+			}
+		} else {
+			h := strings.SplitN(line, ":", 2)
+			key, val := strings.TrimSpace(h[0]), strings.TrimSpace(h[1])
+			for _, v := range strings.Split(val, ",") {
+				headers.Add(key, v)
+			}
+		}
+	}
+
+	var data ResponseBody
+	err := json.Unmarshal(body, &data)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return data, headers, status
+}
 
 // Writes Response to the request
 // Server side code
@@ -122,9 +165,11 @@ func WriteResponse(conn net.Conn, data []byte, Status HTTPStatus, headers Header
 			line := []byte("Content-Length:" + headers[key][0] + "\n")
 			resp = append(resp, line...)
 		}
-		line := []byte("Server:HomeCloud/0.0.1")
+		line := []byte("Server:HomeCloud/0.0.1\n")
 		resp = append(resp, line...)
 	}
+	resp = append(resp, []byte("\n")...)
+	resp = append(resp, data...)
 	return resp
 }
 
