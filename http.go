@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-var filePath = "/Users/samvelhovhannisyan/Documents/dev/Personal/HomeCloud/Vault"
+var filePath = "/Users/samvelhovhannisyan/Documents/dev/Personal/HomeCloud/server/Vault"
 
 type HTTPRequest struct {
 	method   string
@@ -95,21 +95,29 @@ func ReadRequest(conn net.Conn) HTTPRequest {
 	reader := bufio.NewReader(conn)
 
 	var headers Header
+	headersFinished := false
 	var message string
 	lenInt := 0
 	var body []byte
 	for {
 		line, err := reader.ReadString('\n')
+
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		if line != "\r\n" {
+		if len(message) == 0 {
+			message = message + line
+			continue
+		}
+
+		if line != "\r\n" && !headersFinished {
 			message = message + line
 			h := strings.SplitN(line, ":", 2)
 			key, val := strings.TrimSpace(h[0]), strings.TrimSpace(h[1])
 			headers.Add(key, val)
 		} else {
+			headersFinished = true
 			message = message + line
 			if len, ok := headers.Get("Content-Length"); ok {
 				lenInt, _ = strconv.Atoi(len[0])
@@ -192,7 +200,7 @@ func ReadResponse(response []byte) (ResponseBody, Header, HTTPStatus) {
 // Writes Response to the request
 // Server side code
 func WriteResponse(conn net.Conn, data []byte, Status HTTPStatus, headers Header) []byte {
-	resp := []byte("HTTP/1.1 " + strconv.Itoa(Status.Code) + Status.Text() + "\r\n")
+	resp := []byte("HTTP/1.1 " + strconv.Itoa(Status.Code) + " " + Status.Text() + "\r\n")
 
 	for _, key := range headers.Keys() {
 		switch key {
@@ -203,10 +211,9 @@ func WriteResponse(conn net.Conn, data []byte, Status HTTPStatus, headers Header
 			line := []byte("Content-Length:" + headers[key][0] + "\r\n")
 			resp = append(resp, line...)
 		}
-		line := []byte("Server:HomeCloud/0.0.1\r\n")
-		resp = append(resp, line...)
 	}
-	resp = append(resp, []byte("\r\n")...)
+	line := []byte("Server:HomeCloud/0.0.1\r\n\r\n")
+	resp = append(resp, line...)
 	resp = append(resp, data...)
 	return resp
 }
@@ -259,6 +266,7 @@ func WriteGetRequest(location string, header Header) []byte {
 			data = append(data, []byte(key+":"+header[key][0]+"\r\n")...)
 		}
 	}
+	data = append(data, []byte("\r\n")...)
 	return data
 }
 
