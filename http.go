@@ -1,7 +1,9 @@
 package httphelper
 
 import (
+	"bufio"
 	"encoding/json"
+	"io"
 	"log"
 	"net"
 	"os"
@@ -10,6 +12,12 @@ import (
 )
 
 var filePath = "/Users/samvelhovhannisyan/Documents/dev/Personal/HomeCloud/Vault"
+
+type HTTPRequest struct {
+	method   string
+	resource string
+	headers  Header
+}
 
 type HTTPStatus struct {
 	Code int
@@ -38,15 +46,16 @@ func (s HTTPStatus) Text() string {
 
 type Header map[string][]string
 
-func (h Header) Get(key string) []string {
-	return h[key]
+func (h Header) Get(key string) ([]string, bool) {
+	val, ok := h[key]
+	return val, ok
 }
 
-func (h Header) Add(key string, value string) {
-	if h == nil {
-		h = make(map[string][]string)
+func (h *Header) Add(key string, value string) {
+	if *h == nil {
+		*h = make(map[string][]string)
 	}
-	h[key] = append(h[key], value)
+	(*h)[key] = append((*h)[key], value)
 }
 
 func (h Header) Keys() []string {
@@ -61,39 +70,68 @@ type ResponseBody struct {
 	Data string `json:"data"`
 }
 
-func ProcessRequest(conn net.Conn, request string) []byte {
-	method, uri, headers := ReadRequest(request)
+func ProcessRequest(conn net.Conn) []byte {
+	request := ReadRequest(conn)
 	var resp []byte
 
-	switch method {
+	switch request.method {
 	case "GET":
-		data, status, respHeader := readGetMethod(uri, headers)
+		data, status, respHeader := readGetMethod(request.resource, request.headers)
 		resp = WriteResponse(conn, data, status, respHeader)
 	case "POST":
-		readPostMethod(uri, headers)
+		readPostMethod(request.resource, request.headers)
 	case "PUT":
-		readPutMethod(uri, headers)
+		readPutMethod(request.resource, request.headers)
 	case "DELETE":
-		readDeleteMethod(uri, headers)
+		readDeleteMethod(request.resource, request.headers)
 	}
 	return resp
 }
 
 // Read and extracts meta information from request
 // Server side code
-func ReadRequest(request string) (string, string, Header) {
-	lines := strings.Split(request, "\n")
-	requestLine := strings.Split(lines[0], " ")
-	method, uri := requestLine[0], requestLine[1]
+
+func ReadRequest(conn net.Conn) HTTPRequest {
+	reader := bufio.NewReader(conn)
+
 	var headers Header
-	for _, line := range lines[1:] {
-		h := strings.SplitN(line, ":", 2)
-		key, val := strings.TrimSpace(h[0]), strings.TrimSpace(h[1])
-		for _, v := range strings.Split(val, ",") {
-			headers.Add(key, v)
+	var message string
+	lenInt := 0
+	var body []byte
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if line != "\r\n" {
+			message = message + line
+			h := strings.SplitN(line, ":", 2)
+			key, val := strings.TrimSpace(h[0]), strings.TrimSpace(h[1])
+			headers.Add(key, val)
+		} else {
+			message = message + line
+			if len, ok := headers.Get("Content-Length"); ok {
+				lenInt, _ = strconv.Atoi(len[0])
+				body = make([]byte, lenInt)
+				_, err = io.ReadFull(reader, body)
+				if err != nil {
+					log.Fatal(err)
+				}
+				message = message + string(body)
+			}
+			break
 		}
 	}
-	return method, uri, headers
+	meta := strings.SplitN(message, " ", 3)
+
+	request := HTTPRequest{
+		method:   meta[0],
+		resource: meta[1],
+		headers:  headers,
+	}
+
+	return request
 }
 
 // Writes Request for some Resource
@@ -112,11 +150,11 @@ func WriteRequest(method int, location string, header Header) []byte {
 func ReadResponse(response []byte) (ResponseBody, Header, HTTPStatus) {
 	// Header and body seperated by \n so a \n\n sequence indicates end of headers
 	strResponse := string(response)
-	parts := strings.Split(strResponse, "\n\n")
+	parts := strings.Split(strResponse, "\r\n\r\n")
 	headersField, body := parts[0], []byte(parts[1])
 	var status HTTPStatus
 	var headers Header
-	for i, line := range strings.Split(headersField, "\n") {
+	for i, line := range strings.Split(headersField, "\r\n") {
 		if i == 0 {
 			components := strings.Split(line, " ")
 			if components[0] != "HTTP/1.1" {
@@ -154,21 +192,21 @@ func ReadResponse(response []byte) (ResponseBody, Header, HTTPStatus) {
 // Writes Response to the request
 // Server side code
 func WriteResponse(conn net.Conn, data []byte, Status HTTPStatus, headers Header) []byte {
-	resp := []byte("HTTP/1.1 " + strconv.Itoa(Status.Code) + Status.Text() + "\n")
+	resp := []byte("HTTP/1.1 " + strconv.Itoa(Status.Code) + Status.Text() + "\r\n")
 
 	for _, key := range headers.Keys() {
 		switch key {
 		case "Content-Type":
-			line := []byte("Content-Type:" + headers[key][0] + "\n")
+			line := []byte("Content-Type:" + headers[key][0] + "\r\n")
 			resp = append(resp, line...)
 		case "Content-Length":
-			line := []byte("Content-Length:" + headers[key][0] + "\n")
+			line := []byte("Content-Length:" + headers[key][0] + "\r\n")
 			resp = append(resp, line...)
 		}
-		line := []byte("Server:HomeCloud/0.0.1\n")
+		line := []byte("Server:HomeCloud/0.0.1\r\n")
 		resp = append(resp, line...)
 	}
-	resp = append(resp, []byte("\n")...)
+	resp = append(resp, []byte("\r\n")...)
 	resp = append(resp, data...)
 	return resp
 }
@@ -191,7 +229,8 @@ func readGetMethod(uri string, headers Header) ([]byte, HTTPStatus, Header) {
 		case "Host":
 			continue
 		case "Accept":
-			if headers.Get(key)[0] == "application/json" {
+			val, _ := headers.Get(key)
+			if val[0] == "application/json" {
 				resp.Data = string(fileData)
 				ResponseHeader.Add("Content-Type", "application/json")
 				Status.Code = 200
@@ -213,11 +252,11 @@ func readGetMethod(uri string, headers Header) ([]byte, HTTPStatus, Header) {
 // Writes Get Requests to send to server
 // Client side code
 func WriteGetRequest(location string, header Header) []byte {
-	data := []byte("GET " + location + " HTTP/1.1\n")
+	data := []byte("GET " + location + " HTTP/1.1\r\n")
 
 	for _, key := range header.Keys() {
 		if len(header[key]) == 1 {
-			data = append(data, []byte(key+":"+header[key][0]+"\n")...)
+			data = append(data, []byte(key+":"+header[key][0]+"\r\n")...)
 		}
 	}
 	return data

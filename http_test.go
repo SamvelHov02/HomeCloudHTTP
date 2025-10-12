@@ -7,7 +7,7 @@ import (
 )
 
 func TestReadResponse(t *testing.T) {
-	response := []byte("HTTP/1.1 200 OK\nContent-Type: application/json\nContent-Length: 11\n\n{\"data\":\"Hi\"}")
+	response := []byte("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 11\r\n\r\n{\"data\":\"Hi\"}")
 	actualResponse, _, actualStatus := ReadResponse(response)
 	expectedResponse := ResponseBody{
 		Data: "Hi",
