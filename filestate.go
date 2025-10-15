@@ -94,6 +94,13 @@ func (l Leaf) Equal(l2 Leaf) bool {
 	return false
 }
 
+func (l Leaf) Changed(l2 Leaf) bool {
+	if l.Equal(l2) && l.Hash != l2.Hash {
+		return true
+	}
+	return false
+}
+
 func GetAllNames(root string, l *Leaf) *Leaf {
 	l.Children = []*Leaf{}
 	contents, err := os.ReadDir(root)
