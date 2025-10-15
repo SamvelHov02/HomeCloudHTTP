@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 const VaultPath = "/Users/samvelhovhannisyan/Documents/dev/Personal/HomeCloud/server/"
@@ -86,6 +87,13 @@ func (l *Leaf) ComputeHash() string {
 	return string(hash[:])
 }
 
+func (l Leaf) Equal(l2 Leaf) bool {
+	if RelativePath(l.Name) == RelativePath(l2.Name) && l.Hash == l2.Hash {
+		return true
+	}
+	return false
+}
+
 func GetAllNames(root string, l *Leaf) *Leaf {
 	l.Children = []*Leaf{}
 	contents, err := os.ReadDir(root)
@@ -121,4 +129,15 @@ func TurnFilesToLeafs(files []string) []Leaf {
 		Leaves = append(Leaves, Leaf{Category: "file", Name: file})
 	}
 	return Leaves
+}
+
+func RelativePath(path string) string {
+	labels := strings.Split(path, "/")
+
+	for i, l := range labels {
+		if l == "Vault" {
+			return strings.Join(labels[i:], "/")
+		}
+	}
+	return ""
 }
