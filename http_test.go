@@ -35,3 +35,7 @@ func TestReadResponse(t *testing.T) {
 		t.Errorf("Got Code %s when Code %s was expected", strconv.Itoa(actualStatus.Code), strconv.Itoa(expectedStatus.Code))
 	}
 }
+
+func TestWriteResponse(t *testing.T) {
+
+}
