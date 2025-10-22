@@ -2,6 +2,7 @@ package httphelper
 
 import (
 	"crypto/sha256"
+	"encoding/json"
 	"log"
 	"os"
 	"path/filepath"
@@ -64,6 +65,14 @@ func (t *Tree) ComputeHash() {
 	}
 
 	t.RootHash = l.ComputeHash()
+}
+
+func (t Tree) JSON() ([]byte, error) {
+	return json.Marshal(t)
+}
+
+func (t *Tree) Rebuild(j []byte) {
+	json.Unmarshal(j, t)
 }
 
 func (l *Leaf) ComputeHash() string {
