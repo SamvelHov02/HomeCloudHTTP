@@ -23,6 +23,45 @@ type HTTPStatus struct {
 	Code int
 }
 
+type EndPoint struct {
+	GetEndpoints    map[string]func(string) []byte
+	PostEndpoints   map[string]func(string) []byte
+	PutEndpoints    map[string]func(string) []byte
+	Deleteendpoints map[string]func(string) []byte
+}
+
+func (e *EndPoint) Get(endpoint string, fn func(string) []byte) {
+	if e.GetEndpoints == nil {
+		e.GetEndpoints = make(map[string]func(string) []byte)
+	}
+
+	e.GetEndpoints[endpoint] = fn
+}
+
+func (e *EndPoint) Post(endpoint string, fn func(string) []byte) {
+	if e.PostEndpoints == nil {
+		e.PostEndpoints = make(map[string]func(string) []byte)
+	}
+
+	e.PostEndpoints[endpoint] = fn
+}
+
+func (e *EndPoint) Put(endpoint string, fn func(string) []byte) {
+	if e.PutEndpoints == nil {
+		e.PutEndpoints = make(map[string]func(string) []byte)
+	}
+
+	e.PutEndpoints[endpoint] = fn
+}
+
+func (e *EndPoint) Delete(endpoint string, fn func(string) []byte) {
+	if e.Deleteendpoints == nil {
+		e.Deleteendpoints = make(map[string]func(string) []byte)
+	}
+
+	e.Deleteendpoints[endpoint] = fn
+}
+
 func (s HTTPStatus) Text() string {
 	switch s.Code {
 	case 200:
