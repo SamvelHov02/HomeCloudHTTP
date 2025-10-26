@@ -13,56 +13,134 @@ import (
 
 var filePath = "/Users/samvelhovhannisyan/Documents/dev/Personal/HomeCloud/server/Vault"
 
-type HTTPRequest struct {
-	method   string
-	resource string
-	headers  Header
+type Request struct {
+	Method   string
+	Resource string
+	Headers  Header
 }
 
-type HTTPStatus struct {
+type Status struct {
 	Code int
 }
 
 type EndPoint struct {
-	GetEndpoints    map[string]func(string) []byte
-	PostEndpoints   map[string]func(string) []byte
-	PutEndpoints    map[string]func(string) []byte
-	Deleteendpoints map[string]func(string) []byte
+	GetEndpoints    map[string]func(Request) []byte
+	PostEndpoints   map[string]func(Request) []byte
+	PutEndpoints    map[string]func(Request) []byte
+	DeleteEndPoints map[string]func(Request) []byte
 }
 
-func (e *EndPoint) Get(endpoint string, fn func(string) []byte) {
+func (e *EndPoint) Get(endpoint string, fn func(Request) []byte) {
 	if e.GetEndpoints == nil {
-		e.GetEndpoints = make(map[string]func(string) []byte)
+		e.GetEndpoints = make(map[string]func(Request) []byte)
 	}
 
 	e.GetEndpoints[endpoint] = fn
 }
 
-func (e *EndPoint) Post(endpoint string, fn func(string) []byte) {
+func (e *EndPoint) Post(endpoint string, fn func(Request) []byte) {
 	if e.PostEndpoints == nil {
-		e.PostEndpoints = make(map[string]func(string) []byte)
+		e.PostEndpoints = make(map[string]func(Request) []byte)
 	}
 
 	e.PostEndpoints[endpoint] = fn
 }
 
-func (e *EndPoint) Put(endpoint string, fn func(string) []byte) {
+func (e *EndPoint) Put(endpoint string, fn func(Request) []byte) {
 	if e.PutEndpoints == nil {
-		e.PutEndpoints = make(map[string]func(string) []byte)
+		e.PutEndpoints = make(map[string]func(Request) []byte)
 	}
 
 	e.PutEndpoints[endpoint] = fn
 }
 
-func (e *EndPoint) Delete(endpoint string, fn func(string) []byte) {
-	if e.Deleteendpoints == nil {
-		e.Deleteendpoints = make(map[string]func(string) []byte)
+func (e *EndPoint) Delete(endpoint string, fn func(Request) []byte) {
+	if e.DeleteEndPoints == nil {
+		e.DeleteEndPoints = make(map[string]func(Request) []byte)
 	}
 
-	e.Deleteendpoints[endpoint] = fn
+	e.DeleteEndPoints[endpoint] = fn
 }
 
-func (s HTTPStatus) Text() string {
+func (e EndPoint) Action(method string, uri string) func(Request) []byte {
+	var fn func(Request) []byte
+	switch strings.ToLower(method) {
+	case "get":
+		if e.GetEndpoints != nil {
+			key := e.ClosestEndpoint(method, uri)
+			fn = e.GetEndpoints[key]
+		}
+	case "post":
+		if e.PostEndpoints != nil {
+			key := e.ClosestEndpoint(method, uri)
+			fn = e.PostEndpoints[key]
+		}
+	case "put":
+		if e.PutEndpoints != nil {
+			key := e.ClosestEndpoint(method, uri)
+			fn = e.PutEndpoints[key]
+		}
+	case "delete":
+		if e.DeleteEndPoints != nil {
+			key := e.ClosestEndpoint(method, uri)
+			fn = e.DeleteEndPoints[key]
+		}
+	}
+	return fn
+}
+
+func (e EndPoint) ClosestEndpoint(method string, uri string) string {
+	var Closest string
+	switch method {
+	case "get":
+		for k := range e.GetEndpoints {
+			if _, ok := e.GetEndpoints[k]; ok {
+				Closest = k
+				break
+			} else if Closest == "" {
+				Closest = k
+			} else {
+				Closest = comparePath(Closest, k, uri)
+			}
+		}
+	case "post":
+		for k := range e.PostEndpoints {
+			if _, ok := e.PostEndpoints[k]; ok {
+				Closest = k
+				break
+			} else if Closest == "" {
+				Closest = k
+			} else {
+				Closest = comparePath(Closest, k, uri)
+			}
+		}
+	case "put":
+		for k := range e.PutEndpoints {
+			if _, ok := e.PutEndpoints[k]; ok {
+				Closest = k
+				break
+			} else if Closest == "" {
+				Closest = k
+			} else {
+				Closest = comparePath(Closest, k, uri)
+			}
+		}
+	case "delete":
+		for k := range e.DeleteEndPoints {
+			if _, ok := e.DeleteEndPoints[k]; ok {
+				Closest = k
+				break
+			} else if Closest == "" {
+				Closest = k
+			} else {
+				Closest = comparePath(Closest, k, uri)
+			}
+		}
+	}
+	return Closest
+}
+
+func (s Status) Text() string {
 	switch s.Code {
 	case 200:
 		return "OK"
@@ -113,16 +191,16 @@ func ProcessRequest(conn net.Conn) []byte {
 	request := ReadRequest(conn)
 	var resp []byte
 
-	switch request.method {
+	switch request.Method {
 	case "GET":
-		data, status, respHeader := readGetMethod(request.resource, request.headers)
-		resp = WriteResponse(conn, data, status, respHeader)
+		data, status, respHeader := ReadGetMethod(request.Resource, request.Headers)
+		resp = WriteResponse(data, status, respHeader)
 	case "POST":
-		readPostMethod(request.resource, request.headers)
+		readPostMethod(request.Resource, request.Headers)
 	case "PUT":
-		readPutMethod(request.resource, request.headers)
+		readPutMethod(request.Resource, request.Headers)
 	case "DELETE":
-		readDeleteMethod(request.resource, request.headers)
+		readDeleteMethod(request.Resource, request.Headers)
 	}
 	return resp
 }
@@ -130,7 +208,7 @@ func ProcessRequest(conn net.Conn) []byte {
 // Read and extracts meta information from request
 // Server side code
 
-func ReadRequest(conn net.Conn) HTTPRequest {
+func ReadRequest(conn net.Conn) Request {
 	reader := bufio.NewReader(conn)
 
 	var headers Header
@@ -172,10 +250,10 @@ func ReadRequest(conn net.Conn) HTTPRequest {
 	}
 	meta := strings.SplitN(message, " ", 3)
 
-	request := HTTPRequest{
-		method:   meta[0],
-		resource: meta[1],
-		headers:  headers,
+	request := Request{
+		Method:   meta[0],
+		Resource: meta[1],
+		Headers:  headers,
 	}
 
 	return request
@@ -194,12 +272,12 @@ func WriteRequest(method int, location string, header Header) []byte {
 
 // Reads the response received from the Server
 // Client side code
-func ReadResponse(response []byte) (ResponseBody, Header, HTTPStatus) {
+func ReadResponse(response []byte) (ResponseBody, Header, Status) {
 	// Header and body seperated by \n so a \n\n sequence indicates end of headers
 	strResponse := string(response)
 	parts := strings.Split(strResponse, "\r\n\r\n")
 	headersField, body := parts[0], []byte(parts[1])
-	var status HTTPStatus
+	var status Status
 	var headers Header
 	for i, line := range strings.Split(headersField, "\r\n") {
 		if i == 0 {
@@ -238,7 +316,7 @@ func ReadResponse(response []byte) (ResponseBody, Header, HTTPStatus) {
 
 // Writes Response to the request
 // Server side code
-func WriteResponse(conn net.Conn, data []byte, Status HTTPStatus, headers Header) []byte {
+func WriteResponse(data []byte, Status Status, headers Header) []byte {
 	resp := []byte("HTTP/1.1 " + strconv.Itoa(Status.Code) + " " + Status.Text() + "\r\n")
 
 	for _, key := range headers.Keys() {
@@ -259,8 +337,8 @@ func WriteResponse(conn net.Conn, data []byte, Status HTTPStatus, headers Header
 
 // Reads Get requests from the Clients,
 // Server side code
-func readGetMethod(uri string, headers Header) ([]byte, HTTPStatus, Header) {
-	var Status HTTPStatus
+func ReadGetMethod(uri string, headers Header) ([]byte, Status, Header) {
+	var Status Status
 	var ResponseHeader Header
 	completePath := filePath + uri
 	fileData, err := os.ReadFile(completePath)

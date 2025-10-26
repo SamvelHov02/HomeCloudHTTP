@@ -18,7 +18,7 @@ func TestReadResponse(t *testing.T) {
 	//"Content-Length": []string{"11"},
 	//}
 
-	expectedStatus := HTTPStatus{Code: 200}
+	expectedStatus := Status{Code: 200}
 
 	if actualResponse.Data != expectedResponse.Data {
 		t.Errorf("Got %s, expected %s", actualResponse.Data, expectedResponse.Data)
