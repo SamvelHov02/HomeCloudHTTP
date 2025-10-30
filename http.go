@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-var filePath = "/Users/samvelhovhannisyan/Documents/dev/Personal/HomeCloud/server/Vault"
+var filePath = "/home/samo/dev/HomeCloud/server/Vault/"
 
 type Request struct {
 	Method   string
@@ -21,123 +21,6 @@ type Request struct {
 
 type Status struct {
 	Code int
-}
-
-type EndPoint struct {
-	GetEndpoints    map[string]func(Request) []byte
-	PostEndpoints   map[string]func(Request) []byte
-	PutEndpoints    map[string]func(Request) []byte
-	DeleteEndPoints map[string]func(Request) []byte
-}
-
-func (e *EndPoint) Get(endpoint string, fn func(Request) []byte) {
-	if e.GetEndpoints == nil {
-		e.GetEndpoints = make(map[string]func(Request) []byte)
-	}
-
-	e.GetEndpoints[endpoint] = fn
-}
-
-func (e *EndPoint) Post(endpoint string, fn func(Request) []byte) {
-	if e.PostEndpoints == nil {
-		e.PostEndpoints = make(map[string]func(Request) []byte)
-	}
-
-	e.PostEndpoints[endpoint] = fn
-}
-
-func (e *EndPoint) Put(endpoint string, fn func(Request) []byte) {
-	if e.PutEndpoints == nil {
-		e.PutEndpoints = make(map[string]func(Request) []byte)
-	}
-
-	e.PutEndpoints[endpoint] = fn
-}
-
-func (e *EndPoint) Delete(endpoint string, fn func(Request) []byte) {
-	if e.DeleteEndPoints == nil {
-		e.DeleteEndPoints = make(map[string]func(Request) []byte)
-	}
-
-	e.DeleteEndPoints[endpoint] = fn
-}
-
-func (e EndPoint) Action(method string, uri string) func(Request) []byte {
-	var fn func(Request) []byte
-	switch strings.ToLower(method) {
-	case "get":
-		if e.GetEndpoints != nil {
-			key := e.ClosestEndpoint(method, uri)
-			fn = e.GetEndpoints[key]
-		}
-	case "post":
-		if e.PostEndpoints != nil {
-			key := e.ClosestEndpoint(method, uri)
-			fn = e.PostEndpoints[key]
-		}
-	case "put":
-		if e.PutEndpoints != nil {
-			key := e.ClosestEndpoint(method, uri)
-			fn = e.PutEndpoints[key]
-		}
-	case "delete":
-		if e.DeleteEndPoints != nil {
-			key := e.ClosestEndpoint(method, uri)
-			fn = e.DeleteEndPoints[key]
-		}
-	}
-	return fn
-}
-
-func (e EndPoint) ClosestEndpoint(method string, uri string) string {
-	var Closest string
-	switch method {
-	case "get":
-		for k := range e.GetEndpoints {
-			if _, ok := e.GetEndpoints[k]; ok {
-				Closest = k
-				break
-			} else if Closest == "" {
-				Closest = k
-			} else {
-				Closest = comparePath(Closest, k, uri)
-			}
-		}
-	case "post":
-		for k := range e.PostEndpoints {
-			if _, ok := e.PostEndpoints[k]; ok {
-				Closest = k
-				break
-			} else if Closest == "" {
-				Closest = k
-			} else {
-				Closest = comparePath(Closest, k, uri)
-			}
-		}
-	case "put":
-		for k := range e.PutEndpoints {
-			if _, ok := e.PutEndpoints[k]; ok {
-				Closest = k
-				break
-			} else if Closest == "" {
-				Closest = k
-			} else {
-				Closest = comparePath(Closest, k, uri)
-			}
-		}
-	case "delete":
-		for k := range e.DeleteEndPoints {
-			if _, ok := e.DeleteEndPoints[k]; ok {
-				Closest = k
-				break
-			} else if Closest == "" {
-				Closest = k
-			} else {
-				Closest = comparePath(Closest, k, uri)
-			}
-		}
-	}
-	return Closest
 }
 
 func (s Status) Text() string {
@@ -191,15 +74,15 @@ func ProcessRequest(conn net.Conn) []byte {
 	request := ReadRequest(conn)
 	var resp []byte
 
-	switch request.Method {
-	case "GET":
+	switch strings.ToLower(request.Method) {
+	case "get":
 		data, status, respHeader := ReadGetMethod(request.Resource, request.Headers)
 		resp = WriteResponse(data, status, respHeader)
-	case "POST":
+	case "post":
 		readPostMethod(request.Resource, request.Headers)
-	case "PUT":
+	case "put":
 		readPutMethod(request.Resource, request.Headers)
-	case "DELETE":
+	case "delete":
 		readDeleteMethod(request.Resource, request.Headers)
 	}
 	return resp
@@ -261,10 +144,10 @@ func ReadRequest(conn net.Conn) Request {
 
 // Writes Request for some Resource
 // Client side code
-func WriteRequest(method int, location string, header Header) []byte {
+func WriteRequest(method string, location string, header Header) []byte {
 	var data []byte
-	switch method {
-	case 1:
+	switch strings.ToLower(method) {
+	case "get":
 		data = WriteGetRequest(location, header)
 	}
 	return data
@@ -376,7 +259,7 @@ func ReadGetMethod(uri string, headers Header) ([]byte, Status, Header) {
 // Writes Get Requests to send to server
 // Client side code
 func WriteGetRequest(location string, header Header) []byte {
-	data := []byte("GET " + location + " HTTP/1.1\r\n")
+	data := []byte("GET " + "/" + location + " HTTP/1.1\r\n")
 
 	for _, key := range header.Keys() {
 		if len(header[key]) == 1 {

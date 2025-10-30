@@ -1,6 +1,9 @@
 package httphelper
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 func comparePath(path1 string, path2 string, reference string) string {
 	path1 = strings.TrimSpace(path1)
@@ -11,13 +14,25 @@ func comparePath(path1 string, path2 string, reference string) string {
 	path2Parts := strings.Split(path2, "/")
 	referenceParts := strings.Split(reference, "/")
 
-	for i, s := range referenceParts {
-		if path1Parts[i] == s && path2Parts[i] != s {
-			return path1
-		} else if path1Parts[i] != s && path2Parts[i] == s {
-			return path2
-		}
+	// If new endpoint has more segmnets than reference it cant be closest match
+	// If new endpoint shorter than current best it cant be closest match
+	if len(path2Parts) > len(referenceParts) || len(path2Parts) < len(path1Parts) {
+		return path1
 	}
 
+	for i, part := range referenceParts {
+		fmt.Println(len(path2Parts), i)
+		if i < len(path1Parts) {
+			if part == path1Parts[i] && part != path2Parts[i] {
+				return path1
+			} else if part != path1Parts[i] && part == path2Parts[i] {
+				return path2
+			}
+		} else if i < len(path2Parts) {
+			if part == path2Parts[i] {
+				return path2
+			}
+		}
+	}
 	return path1
 }
