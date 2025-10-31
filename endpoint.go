@@ -1,6 +1,9 @@
 package httphelper
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 type EndPoint struct {
 	GetEndpoints    map[string]func(Request) []byte
@@ -47,6 +50,7 @@ func (e EndPoint) Action(method string, uri string) func(Request) []byte {
 	case "get":
 		if e.GetEndpoints != nil {
 			key := e.ClosestEndpoint(method, uri)
+			fmt.Println("Matched GET endpoint: ", key)
 			fn = e.GetEndpoints[key]
 		}
 	case "post":
@@ -72,6 +76,7 @@ func (e EndPoint) ClosestEndpoint(method string, uri string) string {
 	var Closest string
 	switch strings.ToLower(method) {
 	case "get":
+		fmt.Println("Requested resource is ", uri)
 		for k := range e.GetEndpoints {
 			if uri == k {
 				Closest = k
@@ -114,5 +119,6 @@ func (e EndPoint) ClosestEndpoint(method string, uri string) string {
 			}
 		}
 	}
+	fmt.Println("Closest matched endpoint is ", Closest)
 	return Closest
 }

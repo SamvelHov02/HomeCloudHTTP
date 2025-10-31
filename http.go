@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-var filePath = "/home/samo/dev/HomeCloud/server/Vault/"
+var filePath = "/home/samo/dev/HomeCloud/server/"
 
 type Request struct {
 	Method   string

@@ -1,7 +1,6 @@
 package httphelper
 
 import (
-	"fmt"
 	"strings"
 )
 
@@ -21,7 +20,6 @@ func comparePath(path1 string, path2 string, reference string) string {
 	}
 
 	for i, part := range referenceParts {
-		fmt.Println(len(path2Parts), i)
 		if i < len(path1Parts) {
 			if part == path1Parts[i] && part != path2Parts[i] {
 				return path1
@@ -29,10 +27,10 @@ func comparePath(path1 string, path2 string, reference string) string {
 				return path2
 			}
 		} else if i < len(path2Parts) {
-			if part == path2Parts[i] {
-				return path2
+			if part != path2Parts[i] {
+				return path1
 			}
 		}
 	}
-	return path1
+	return path2
 }
