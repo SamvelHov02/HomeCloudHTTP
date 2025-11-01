@@ -18,6 +18,7 @@ type Request struct {
 	Method   string
 	Resource string
 	Headers  Header
+	Data     Body
 }
 
 type Status struct {
@@ -30,6 +31,8 @@ func (s Status) Text() string {
 		return "OK"
 	case 201:
 		return "Created"
+	case 204:
+		return "No Content"
 	case 301:
 		return "Moved Permanently"
 	case 302:
@@ -40,6 +43,8 @@ func (s Status) Text() string {
 		return "Unauthorized"
 	case 404:
 		return "Not Found"
+	case 409:
+		return "Conflict"
 	default:
 		return ""
 	}
@@ -67,7 +72,7 @@ func (h Header) Keys() []string {
 	return keys
 }
 
-type ResponseBody struct {
+type Body struct {
 	Data string `json:"data"`
 }
 
@@ -77,10 +82,11 @@ func ProcessRequest(conn net.Conn) []byte {
 
 	switch strings.ToLower(request.Method) {
 	case "get":
-		data, status, respHeader := ReadGetMethod(request.Resource, request.Headers)
+		data, status, respHeader := ReadGetMethod(request)
 		resp = WriteResponse(data, status, respHeader)
 	case "post":
-		readPostMethod(request.Resource, request.Headers)
+		data, status, respHeader := ReadPostMethod(request)
+		resp = WriteResponse(data, status, respHeader)
 	case "put":
 		readPutMethod(request.Resource, request.Headers)
 	case "delete":
@@ -91,15 +97,12 @@ func ProcessRequest(conn net.Conn) []byte {
 
 // Read and extracts meta information from request
 // Server side code
-
 func ReadRequest(conn net.Conn) Request {
 	reader := bufio.NewReader(conn)
 
-	var headers Header
-	headersFinished := false
 	var message string
-	lenInt := 0
-	var body []byte
+	var Headers Header
+	var Method, Resource string
 	for {
 		line, err := reader.ReadString('\n')
 
@@ -107,40 +110,48 @@ func ReadRequest(conn net.Conn) Request {
 			log.Fatal(err)
 		}
 
+		// First line isn't headers
 		if len(message) == 0 {
 			message = message + line
+			lineParts := strings.SplitN(line, " ", 3)
+			Method, Resource = lineParts[0], lineParts[1]
 			continue
 		}
 
-		if line != "\r\n" && !headersFinished {
-			message = message + line
-			h := strings.SplitN(line, ":", 2)
-			key, val := strings.TrimSpace(h[0]), strings.TrimSpace(h[1])
-			headers.Add(key, val)
-		} else {
-			headersFinished = true
-			message = message + line
-			if len, ok := headers.Get("Content-Length"); ok {
-				lenInt, _ = strconv.Atoi(len[0])
-				body = make([]byte, lenInt)
-				_, err = io.ReadFull(reader, body)
-				if err != nil {
-					log.Fatal(err)
-				}
-				message = message + string(body)
-			}
+		h := strings.SplitN(line, ":", 2)
+		key, val := strings.TrimSpace(h[0]), strings.TrimSpace(h[1])
+		Headers.Add(key, val)
+
+		// Header section ended
+		if line == "\r\n" {
 			break
 		}
-	}
-	meta := strings.SplitN(message, " ", 3)
-
-	request := Request{
-		Method:   meta[0],
-		Resource: meta[1],
-		Headers:  headers,
+		message = message + line
 	}
 
-	return request
+	dataLenStr, _ := Headers.Get("Content-Length")
+	dataLen, err := strconv.Atoi(dataLenStr[0])
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	buf := make([]byte, dataLen)
+
+	_, err = io.ReadFull(reader, buf)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	req := Request{
+		Method:   Method,
+		Resource: Resource,
+		Headers:  Headers,
+		Data:     Body{Data: string(buf)},
+	}
+
+	return req
 }
 
 // Writes Request for some Resource
@@ -156,7 +167,7 @@ func WriteRequest(method string, location string, header Header) []byte {
 
 // Reads the response received from the Server
 // Client side code
-func ReadResponse(response []byte) (ResponseBody, Header, Status) {
+func ReadResponse(response []byte) (Body, Header, Status) {
 	// Header and body seperated by \n so a \n\n sequence indicates end of headers
 	strResponse := string(response)
 	parts := strings.Split(strResponse, "\r\n\r\n")
@@ -188,7 +199,7 @@ func ReadResponse(response []byte) (ResponseBody, Header, Status) {
 		}
 	}
 
-	var data ResponseBody
+	var data Body
 	err := json.Unmarshal(body, &data)
 
 	if err != nil {
@@ -221,24 +232,24 @@ func WriteResponse(data []byte, Status Status, headers Header) []byte {
 
 // Reads Get requests from the Clients,
 // Server side code
-func ReadGetMethod(uri string, headers Header) ([]byte, Status, Header) {
+func ReadGetMethod(request Request) ([]byte, Status, Header) {
 	var Status Status
 	var ResponseHeader Header
-	completePath := filePath + uri[1:]
-	fmt.Println("Requested file path:", uri)
+	completePath := filePath + request.Resource[1:]
+	fmt.Println("Requested file path:", request.Resource)
 	fileData, err := os.ReadFile(completePath)
-	resp := ResponseBody{}
+	resp := Body{}
 
 	if err == os.ErrNotExist {
 		Status.Code = 401
 	}
 
-	for _, key := range headers.Keys() {
+	for _, key := range request.Headers.Keys() {
 		switch key {
 		case "Host":
 			continue
 		case "Accept":
-			val, _ := headers.Get(key)
+			val, _ := request.Headers.Get(key)
 			if val[0] == "application/json" {
 				resp.Data = string(fileData)
 				ResponseHeader.Add("Content-Type", "application/json")
@@ -275,11 +286,76 @@ func WriteGetRequest(location string, header Header) []byte {
 
 // Reads Post requests from the Clients,
 // Server side code
-func readPostMethod(uri string, headers Header) {}
+func ReadPostMethod(request Request) ([]byte, Status, Header) {
+	var Status Status
+	var RespHeader Header
+	completePath := filePath + request.Resource[1:]
+
+	fmt.Println("POST Request for file path:", request.Resource)
+
+	for _, key := range request.Headers.Keys() {
+		switch key {
+		case "Host":
+			continue
+		case "Content-Type":
+			if h, _ := request.Headers.Get(key); h[0] != "application/json" {
+				Status.Code = 400
+			}
+		case "Content-Length":
+			val, _ := request.Headers.Get(key)
+			lenInt, _ := strconv.Atoi(val[0])
+			// Body length should be greater than 0
+			if lenInt <= 0 {
+				Status.Code = 400
+			}
+		}
+	}
+
+	// If something wrong in the headers no need to proceed with body
+	if Status.Code == 0 {
+		fmt.Println("Gets to create file")
+		fmt.Println("Complete Path:", completePath)
+		if _, err := os.Stat(completePath); os.IsNotExist(err) {
+			file, err := os.Create(completePath)
+
+			if err != nil {
+				log.Fatal(err)
+			}
+			defer file.Close()
+
+			file.WriteString(request.Data.Data)
+			Status.Code = 204
+		} else {
+			// File already exists
+			Status.Code = 409
+
+		}
+	}
+
+	RespHeader.Add("Content-Length", "0")
+	RespHeader.Add("Content-Type", "application/json")
+
+	return []byte{}, Status, RespHeader
+}
 
 // Writes Post Requests to send to server
 // Client side code
-func WritePostRequest() {}
+func WritePostRequest(location string, header Header, body Body) []byte {
+	fmt.Println("Writing POST request for location:", location)
+	dataRaw, err := json.Marshal(body)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	data := []byte("POST " + location + " HTTP/1.1\r\n")
+
+	for _, key := range header.Keys() {
+		data = append(data, []byte(key+":"+header[key][0]+"\r\n")...)
+	}
+	data = append(data, []byte("\r\n")...)
+	data = append(data, dataRaw...)
+	return data
+}
 
 // Reads Put requests from the Clients,
 // Server side code
