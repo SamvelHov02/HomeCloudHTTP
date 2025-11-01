@@ -3,6 +3,7 @@ package httphelper
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -242,8 +243,8 @@ func ReadGetMethod(request Request) ([]byte, Status, Header) {
 	fileData, err := os.ReadFile(completePath)
 	resp := Body{}
 
-	if err == os.ErrNotExist {
-		Status.Code = 401
+	if errors.Is(err, os.ErrNotExist) {
+		Status.Code = 404
 	}
 
 	for _, key := range request.Headers.Keys() {
