@@ -156,11 +156,13 @@ func ReadRequest(conn net.Conn) Request {
 
 // Writes Request for some Resource
 // Client side code
-func WriteRequest(method string, location string, header Header) []byte {
+func WriteRequest(method string, location string, header Header, body Body) []byte {
 	var data []byte
 	switch strings.ToLower(method) {
 	case "get":
 		data = WriteGetRequest(location, header)
+	case "post":
+		data = WritePostRequest(location, header, body)
 	}
 	return data
 }
