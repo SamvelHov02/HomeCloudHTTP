@@ -340,7 +340,22 @@ func ReadPostMethod(request Request) ([]byte, Status, Header) {
 
 // Writes Post Requests to send to server
 // Client side code
-func WritePostRequest() {}
+func WritePostRequest(location string, header Header, body Body) []byte {
+	fmt.Println("Writing POST request for location:", location)
+	dataRaw, err := json.Marshal(body)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	data := []byte("POST " + location + " HTTP/1.1\r\n")
+
+	for _, key := range header.Keys() {
+		data = append(data, []byte(key+":"+header[key][0]+"\r\n")...)
+	}
+	data = append(data, []byte("\r\n")...)
+	data = append(data, dataRaw...)
+	return data
+}
 
 // Reads Put requests from the Clients,
 // Server side code

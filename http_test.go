@@ -96,3 +96,20 @@ func TestReadPostMethod(t *testing.T) {
 		}
 	}
 }
+
+func TestWritePostRequest(t *testing.T) {
+	data := Body{
+		Data: "This is a test file.",
+	}
+
+	headers := Header{}
+	headers.Add("Content-Type", "application/json")
+	headers.Add("Content-Length", "37")
+
+	actualRequest := WritePostRequest("/testfile.txt", headers, data)
+	expectedRequest := []byte("POST /testfile.txt HTTP/1.1\r\nContent-Type:application/json\r\nContent-Length:37\r\n\r\n{\"data\":\"This is a test file.\"}")
+
+	if string(actualRequest) != string(expectedRequest) {
+		t.Errorf("Got %s, expected %s", string(actualRequest), string(expectedRequest))
+	}
+}
