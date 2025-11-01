@@ -319,15 +319,19 @@ func ReadPostMethod(request Request) ([]byte, Status, Header) {
 		fmt.Println("Gets to create file")
 		fmt.Println("Complete Path:", completePath)
 		if _, err := os.Stat(completePath); os.IsNotExist(err) {
-			file, err := os.Create(completePath)
+			if !Info.IsDir() {
+				file, err := os.Create(completePath)
 
-			if err != nil {
-				log.Fatal(err)
+				if err != nil {
+					log.Fatal(err)
+				}
+				defer file.Close()
+
+				file.WriteString(request.Data.Data)
+				Status.Code = 204
+			} else {
+				err := os.Mkdir(completePath, 0755)
 			}
-			defer file.Close()
-
-			file.WriteString(request.Data.Data)
-			Status.Code = 204
 		} else {
 			// File already exists
 			Status.Code = 409
