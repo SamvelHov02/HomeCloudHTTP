@@ -5,6 +5,14 @@ wanted to implement my own HTTP library to better understand how one actually wo
 
 ## TODO
 
-- Endpoints : server applications should be able to create API endpoints like (/get/tree)
-  - How should the endpoint be implemented, the map structure should be of type string -> func(HTTPHEADER) []byte, will this work everywhere?
-  - d
+### POST
+
+Need to implement the POST method workflows. How will this look like and What is needed to be implemented.
+
+1. __INIT__     : Server sets up endpoints for post methods like /api/post/..., listens for connection 
+2. ___Client__  : Runs a cli command like `./main.go -p file.txt`, need to implement Command in commands.go, connects to server and sends data
+3. __Server__   : Reads the requested action, creating a new file contents.
+  - If the file already exists returns HTTP status 409 
+  - If file doesn't exist it creates file as requested and responds with 204, (201, 200 are also sometimes used).
+  - Sends response to Client 
+4. __Client__   : The Client reads the response
