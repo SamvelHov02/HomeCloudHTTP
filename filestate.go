@@ -2,6 +2,7 @@ package httphelper
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"log"
 	"os"
@@ -9,7 +10,7 @@ import (
 	"strings"
 )
 
-const VaultPath = "/Users/samvelhovhannisyan/Documents/dev/Personal/HomeCloud/server/"
+const VaultPath = "home/samo/dev/HomeCloud/server/Vault"
 
 type Tree struct {
 	Root     string  `json:"root"`
@@ -82,18 +83,25 @@ func (l *Leaf) ComputeHash() string {
 			log.Fatal(err)
 		}
 		hashData := sha256.Sum256(data)
-		hashStr := string(hashData[:])
-		return hashStr
+		l.Hash = hex.EncodeToString(hashData[:])
+		return l.Hash
 	}
 
 	ChildHashes := []byte{}
 	for _, child := range l.Children {
-		ChildHashes = append(ChildHashes, []byte(child.ComputeHash())...)
+		ChildHashHex := child.ComputeHash()
+		ChildHash, err := hex.DecodeString(ChildHashHex)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+		ChildHashes = append(ChildHashes, ChildHash...)
 	}
 
 	hash := sha256.Sum256(ChildHashes)
 
-	return string(hash[:])
+	l.Hash = hex.EncodeToString(hash[:])
+	return l.Hash
 }
 
 func (l Leaf) Equal(l2 Leaf) bool {

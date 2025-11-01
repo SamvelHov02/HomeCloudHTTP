@@ -3,6 +3,7 @@ package httphelper
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -11,7 +12,7 @@ import (
 	"strings"
 )
 
-var filePath = "/home/samo/dev/HomeCloud/server/"
+const filePath = "/home/samo/dev/HomeCloud/server/"
 
 type Request struct {
 	Method   string
@@ -223,7 +224,8 @@ func WriteResponse(data []byte, Status Status, headers Header) []byte {
 func ReadGetMethod(uri string, headers Header) ([]byte, Status, Header) {
 	var Status Status
 	var ResponseHeader Header
-	completePath := filePath + uri
+	completePath := filePath + uri[1:]
+	fmt.Println("Requested file path:", uri)
 	fileData, err := os.ReadFile(completePath)
 	resp := ResponseBody{}
 
@@ -259,6 +261,7 @@ func ReadGetMethod(uri string, headers Header) ([]byte, Status, Header) {
 // Writes Get Requests to send to server
 // Client side code
 func WriteGetRequest(location string, header Header) []byte {
+	fmt.Println("Writing GET request for location:", location)
 	data := []byte("GET " + "/" + location + " HTTP/1.1\r\n")
 
 	for _, key := range header.Keys() {
