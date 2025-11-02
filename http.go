@@ -3,17 +3,13 @@ package httphelper
 import (
 	"bufio"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net"
-	"os"
 	"strconv"
 	"strings"
 )
-
-const filePath = "/home/samo/dev/HomeCloud/server/"
 
 type Request struct {
 	Method   string
@@ -75,25 +71,6 @@ func (h Header) Keys() []string {
 
 type Body struct {
 	Data string `json:"data"`
-}
-
-func ProcessRequest(conn net.Conn) []byte {
-	request := ReadRequest(conn)
-	var resp []byte
-
-	switch strings.ToLower(request.Method) {
-	case "get":
-		data, status, respHeader := ReadGetMethod(request)
-		resp = WriteResponse(data, status, respHeader)
-	case "post":
-		data, status, respHeader := ReadPostMethod(request)
-		resp = WriteResponse(data, status, respHeader)
-	case "put":
-		readPutMethod(request.Resource, request.Headers)
-	case "delete":
-		readDeleteMethod(request.Resource, request.Headers)
-	}
-	return resp
 }
 
 // Read and extracts meta information from request
@@ -173,7 +150,8 @@ func WriteRequest(method string, location string, header Header, body Body) []by
 func ReadResponse(response []byte) (Body, Header, Status) {
 	// Header and body seperated by \n so a \n\n sequence indicates end of headers
 	strResponse := string(response)
-	parts := strings.Split(strResponse, "\r\n\r\n")
+	// Response might not have a body, hence SplitN
+	parts := strings.SplitN(strResponse, "\r\n\r\n", 2)
 	headersField, body := parts[0], []byte(parts[1])
 	var status Status
 	var headers Header
@@ -233,45 +211,6 @@ func WriteResponse(data []byte, Status Status, headers Header) []byte {
 	return resp
 }
 
-// Reads Get requests from the Clients,
-// Server side code
-func ReadGetMethod(request Request) ([]byte, Status, Header) {
-	var Status Status
-	var ResponseHeader Header
-	completePath := filePath + request.Resource[1:]
-	fmt.Println("Requested file path:", request.Resource)
-	fileData, err := os.ReadFile(completePath)
-	resp := Body{}
-
-	if errors.Is(err, os.ErrNotExist) {
-		Status.Code = 404
-	}
-
-	for _, key := range request.Headers.Keys() {
-		switch key {
-		case "Host":
-			continue
-		case "Accept":
-			val, _ := request.Headers.Get(key)
-			if val[0] == "application/json" {
-				resp.Data = string(fileData)
-				ResponseHeader.Add("Content-Type", "application/json")
-				Status.Code = 200
-			}
-			// case "Authorization":
-			// continue
-		}
-	}
-	dataJSON, err := json.Marshal(resp)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	ResponseHeader.Add("Content-Length", strconv.Itoa(len(dataJSON)))
-
-	return dataJSON, Status, ResponseHeader
-}
-
 // Writes Get Requests to send to server
 // Client side code
 func WriteGetRequest(location string, header Header) []byte {
@@ -285,64 +224,6 @@ func WriteGetRequest(location string, header Header) []byte {
 	}
 	data = append(data, []byte("\r\n")...)
 	return data
-}
-
-// Reads Post requests from the Clients,
-// Server side code
-func ReadPostMethod(request Request) ([]byte, Status, Header) {
-	var Status Status
-	var RespHeader Header
-	completePath := filePath + request.Resource[1:]
-
-	fmt.Println("POST Request for file path:", request.Resource)
-
-	for _, key := range request.Headers.Keys() {
-		switch key {
-		case "Host":
-			continue
-		case "Content-Type":
-			if h, _ := request.Headers.Get(key); h[0] != "application/json" {
-				Status.Code = 400
-			}
-		case "Content-Length":
-			val, _ := request.Headers.Get(key)
-			lenInt, _ := strconv.Atoi(val[0])
-			// Body length should be greater than 0
-			if lenInt <= 0 {
-				Status.Code = 400
-			}
-		}
-	}
-
-	// If something wrong in the headers no need to proceed with body
-	if Status.Code == 0 {
-		fmt.Println("Gets to create file")
-		fmt.Println("Complete Path:", completePath)
-		if _, err := os.Stat(completePath); os.IsNotExist(err) {
-			if !Info.IsDir() {
-				file, err := os.Create(completePath)
-
-				if err != nil {
-					log.Fatal(err)
-				}
-				defer file.Close()
-
-				file.WriteString(request.Data.Data)
-				Status.Code = 204
-			} else {
-				err := os.Mkdir(completePath, 0755)
-			}
-		} else {
-			// File already exists
-			Status.Code = 409
-
-		}
-	}
-
-	RespHeader.Add("Content-Length", "0")
-	RespHeader.Add("Content-Type", "application/json")
-
-	return []byte{}, Status, RespHeader
 }
 
 // Writes Post Requests to send to server
@@ -364,17 +245,9 @@ func WritePostRequest(location string, header Header, body Body) []byte {
 	return data
 }
 
-// Reads Put requests from the Clients,
-// Server side code
-func readPutMethod(uri string, headers Header) {}
-
 // Writes Put Requests to send to server
 // Client side code
 func WritePutRequest() {}
-
-// Reads Delete requests from the Clients,
-// Server side code
-func readDeleteMethod(uri string, headers Header) {}
 
 // Writes Delete Requests to send to server
 // Client side code
