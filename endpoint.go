@@ -44,81 +44,58 @@ func (e *EndPoint) Delete(endpoint string, fn func(Request) []byte) {
 	e.DeleteEndPoints[endpoint] = fn
 }
 
-func (e EndPoint) Action(method string, uri string) func(Request) []byte {
+func (e EndPoint) Action(method string, uri string) (func(Request) []byte, string) {
 	var fn func(Request) []byte
+	var key string
 	switch strings.ToLower(method) {
 	case "get":
 		if e.GetEndpoints != nil {
-			key := e.ClosestEndpoint(method, uri)
+			key = e.ClosestEndpoint(method, uri)
 			fmt.Println("Matched GET endpoint: ", key)
 			fn = e.GetEndpoints[key]
 		}
 	case "post":
 		if e.PostEndpoints != nil {
-			key := e.ClosestEndpoint(method, uri)
+			key = e.ClosestEndpoint(method, uri)
 			fn = e.PostEndpoints[key]
 		}
 	case "put":
 		if e.PutEndpoints != nil {
-			key := e.ClosestEndpoint(method, uri)
+			key = e.ClosestEndpoint(method, uri)
 			fn = e.PutEndpoints[key]
 		}
 	case "delete":
 		if e.DeleteEndPoints != nil {
-			key := e.ClosestEndpoint(method, uri)
+			key = e.ClosestEndpoint(method, uri)
 			fn = e.DeleteEndPoints[key]
 		}
 	}
-	return fn
+	return fn, key
 }
 
 func (e EndPoint) ClosestEndpoint(method string, uri string) string {
 	var Closest string
+	var Iter map[string]func(Request) []byte
 	switch strings.ToLower(method) {
 	case "get":
-		fmt.Println("Requested resource is ", uri)
-		for k := range e.GetEndpoints {
-			if uri == k {
-				Closest = k
-				break
-			} else {
-				Closest = comparePath(Closest, k, uri)
-			}
-		}
+		Iter = e.GetEndpoints
 	case "post":
-		for k := range e.PostEndpoints {
-			if _, ok := e.PostEndpoints[k]; ok {
-				Closest = k
-				break
-			} else if Closest == "" {
-				Closest = k
-			} else {
-				Closest = comparePath(Closest, k, uri)
-			}
-		}
+		Iter = e.PostEndpoints
 	case "put":
-		for k := range e.PutEndpoints {
-			if _, ok := e.PutEndpoints[k]; ok {
-				Closest = k
-				break
-			} else if Closest == "" {
-				Closest = k
-			} else {
-				Closest = comparePath(Closest, k, uri)
-			}
-		}
+		Iter = e.PutEndpoints
 	case "delete":
-		for k := range e.DeleteEndPoints {
-			if _, ok := e.DeleteEndPoints[k]; ok {
-				Closest = k
-				break
-			} else if Closest == "" {
-				Closest = k
-			} else {
-				Closest = comparePath(Closest, k, uri)
-			}
+		Iter = e.DeleteEndPoints
+	}
+
+	fmt.Println("Requested resource is ", uri)
+	for k := range Iter {
+		if uri == k {
+			Closest = k
+			break
+		} else {
+			Closest = comparePath(Closest, k, uri)
 		}
 	}
-	fmt.Println("Closest matched endpoint is ", Closest)
+	fmt.Println("Closest matched endpoiddnt is ", Closest)
 	return Closest
 }
