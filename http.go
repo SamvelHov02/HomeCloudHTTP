@@ -3,7 +3,6 @@ package httphelper
 import (
 	"bufio"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net"
@@ -96,14 +95,14 @@ func ReadRequest(conn net.Conn) Request {
 			continue
 		}
 
-		h := strings.SplitN(line, ":", 2)
-		key, val := strings.TrimSpace(h[0]), strings.TrimSpace(h[1])
-		Headers.Add(key, val)
-
 		// Header section ended
 		if line == "\r\n" {
 			break
 		}
+
+		h := strings.SplitN(line, ":", 2)
+		key, val := strings.TrimSpace(h[0]), strings.TrimSpace(h[1])
+		Headers.Add(key, val)
 		message = message + line
 	}
 
@@ -122,11 +121,15 @@ func ReadRequest(conn net.Conn) Request {
 		log.Fatal(err)
 	}
 
+	d := &Body{}
+
+	json.Unmarshal(buf, d)
+
 	req := Request{
 		Method:   Method,
 		Resource: Resource,
 		Headers:  Headers,
-		Data:     Body{Data: string(buf)},
+		Data:     *d,
 	}
 
 	return req
@@ -157,7 +160,7 @@ func ReadResponse(response []byte) (Body, Header, Status) {
 	var headers Header
 	for i, line := range strings.Split(headersField, "\r\n") {
 		if i == 0 {
-			components := strings.Split(line, " ")
+			components := strings.SplitN(line, " ", 3)
 			if components[0] != "HTTP/1.1" {
 				log.Fatal("Bad Response 1")
 			}
@@ -181,10 +184,14 @@ func ReadResponse(response []byte) (Body, Header, Status) {
 	}
 
 	var data Body
-	err := json.Unmarshal(body, &data)
 
-	if err != nil {
-		log.Fatal(err)
+	if strings.TrimSpace(string(parts[1])) != "" {
+
+		err := json.Unmarshal(body, &data)
+
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	return data, headers, status
@@ -205,8 +212,8 @@ func WriteResponse(data []byte, Status Status, headers Header) []byte {
 			resp = append(resp, line...)
 		}
 	}
-	line := []byte("Server:HomeCloud/0.0.1\r\n\r\n")
-	resp = append(resp, line...)
+
+	resp = append(resp, []byte("Server:HomeCloud/0.0.1\r\n\r\n")...)
 	resp = append(resp, data...)
 	return resp
 }
@@ -214,7 +221,6 @@ func WriteResponse(data []byte, Status Status, headers Header) []byte {
 // Writes Get Requests to send to server
 // Client side code
 func WriteGetRequest(location string, header Header) []byte {
-	fmt.Println("Writing GET request for location:", location)
 	data := []byte("GET " + "/" + location + " HTTP/1.1\r\n")
 
 	for _, key := range header.Keys() {
@@ -229,13 +235,13 @@ func WriteGetRequest(location string, header Header) []byte {
 // Writes Post Requests to send to server
 // Client side code
 func WritePostRequest(location string, header Header, body Body) []byte {
-	fmt.Println("Writing POST request for location:", location)
 	dataRaw, err := json.Marshal(body)
+	header.Add("Content-Length", strconv.Itoa(len(dataRaw)))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	data := []byte("POST " + location + " HTTP/1.1\r\n")
+	data := []byte("POST " + "/" + location + " HTTP/1.1\r\n")
 
 	for _, key := range header.Keys() {
 		data = append(data, []byte(key+":"+header[key][0]+"\r\n")...)
