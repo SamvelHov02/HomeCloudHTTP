@@ -146,6 +146,8 @@ func WriteRequest(method string, location string, header Header, body Body) []by
 		data = WritePostRequest(location, header, body)
 	case "put":
 		data = WritePutRequest(location, header, body)
+	case "delete":
+		data = WriteDeleteRequest(location, header)
 	}
 	return data
 }
@@ -275,4 +277,14 @@ func WritePutRequest(location string, header Header, body Body) []byte {
 
 // Writes Delete Requests to send to server
 // Client side code
-func WriteDeleteRequest() {}
+func WriteDeleteRequest(location string, header Header) []byte {
+	data := []byte("DELETE /" + location + " HTTP/1.1\r\n")
+
+	for _, key := range header.Keys() {
+		data = append(data, []byte(key+":"+header[key][0]+"\r\n")...)
+	}
+
+	data = append(data, []byte("\r\n")...)
+
+	return data
+}
