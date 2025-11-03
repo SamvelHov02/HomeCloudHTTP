@@ -144,6 +144,8 @@ func WriteRequest(method string, location string, header Header, body Body) []by
 		data = WriteGetRequest(location, header)
 	case "post":
 		data = WritePostRequest(location, header, body)
+	case "put":
+		data = WritePutRequest(location, header, body)
 	}
 	return data
 }
@@ -241,7 +243,7 @@ func WritePostRequest(location string, header Header, body Body) []byte {
 		log.Fatal(err)
 	}
 
-	data := []byte("POST " + "/" + location + " HTTP/1.1\r\n")
+	data := []byte("POST /" + location + " HTTP/1.1\r\n")
 
 	for _, key := range header.Keys() {
 		data = append(data, []byte(key+":"+header[key][0]+"\r\n")...)
@@ -253,7 +255,23 @@ func WritePostRequest(location string, header Header, body Body) []byte {
 
 // Writes Put Requests to send to server
 // Client side code
-func WritePutRequest() {}
+func WritePutRequest(location string, header Header, body Body) []byte {
+	dataRaw, err := json.Marshal(body)
+	header.Add("Content-Length", strconv.Itoa(len(dataRaw)))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	data := []byte("PUT /" + location + " HTTP/1.1\r\n")
+
+	for _, key := range header.Keys() {
+		data = append(data, []byte(key+":"+header[key][0]+"\r\n")...)
+	}
+
+	data = append(data, []byte("\r\n")...)
+	data = append(data, dataRaw...)
+	return data
+}
 
 // Writes Delete Requests to send to server
 // Client side code
