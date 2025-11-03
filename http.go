@@ -144,6 +144,8 @@ func WriteRequest(method string, location string, header Header, body Body) []by
 		data = WriteGetRequest(location, header)
 	case "post":
 		data = WritePostRequest(location, header, body)
+	case "put":
+		data = WritePutRequest(location, header, body)
 	}
 	return data
 }
@@ -255,6 +257,7 @@ func WritePostRequest(location string, header Header, body Body) []byte {
 // Client side code
 func WritePutRequest(location string, header Header, body Body) []byte {
 	dataRaw, err := json.Marshal(body)
+	header.Add("Content-Length", strconv.Itoa(len(dataRaw)))
 	if err != nil {
 		log.Fatal(err)
 	}
