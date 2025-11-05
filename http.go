@@ -154,7 +154,7 @@ func WriteRequest(method string, location string, header Header, body Body) []by
 
 // Reads the response received from the Server
 // Client side code
-func ReadResponse(response []byte) (Body, Header, Status) {
+func ReadResponse(response []byte) ([]byte, Header, Status) {
 	// Header and body seperated by \n so a \n\n sequence indicates end of headers
 	strResponse := string(response)
 	// Response might not have a body, hence SplitN
@@ -187,18 +187,7 @@ func ReadResponse(response []byte) (Body, Header, Status) {
 		}
 	}
 
-	var data Body
-
-	if strings.TrimSpace(string(parts[1])) != "" {
-
-		err := json.Unmarshal(body, &data)
-
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-
-	return data, headers, status
+	return body, headers, status
 }
 
 // Writes Response to the request
@@ -218,7 +207,10 @@ func WriteResponse(data []byte, Status Status, headers Header) []byte {
 	}
 
 	resp = append(resp, []byte("Server:HomeCloud/0.0.1\r\n\r\n")...)
-	resp = append(resp, data...)
+
+	if len(data) > 0 {
+		resp = append(resp, data...)
+	}
 	return resp
 }
 
