@@ -1,6 +1,7 @@
 package httphelper
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"testing"
@@ -18,10 +19,13 @@ func TestReadResponse(t *testing.T) {
 	//"Content-Length": []string{"11"},
 	//}
 
+	ActualData := Body{}
+	json.Unmarshal(actualResponse, &ActualData)
+
 	expectedStatus := Status{Code: 200}
 
-	if actualResponse.Data != expectedResponse.Data {
-		t.Errorf("Got %s, expected %s", actualResponse.Data, expectedResponse.Data)
+	if ActualData.Data != expectedResponse.Data {
+		t.Errorf("Got %s, expected %s", ActualData.Data, expectedResponse.Data)
 	}
 
 	// if !reflect.DeepEqual(actualHeaders, expectedHeaders) {
