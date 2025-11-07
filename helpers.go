@@ -34,3 +34,13 @@ func comparePath(path1 string, path2 string, reference string) string {
 	}
 	return path2
 }
+
+// Returns the correct path where encodings have been replaced
+func ResourceToPath(resource string) string {
+	return strings.ReplaceAll(resource, "+", " ")
+}
+
+// Returns the correct resource for a path with space
+func PathToResource(path string) string {
+	return strings.ReplaceAll(path, " ", "+")
+}

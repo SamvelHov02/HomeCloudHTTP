@@ -139,6 +139,7 @@ func ReadRequest(conn net.Conn) Request {
 // Client side code
 func WriteRequest(method string, location string, header Header, body Body) []byte {
 	var data []byte
+	location = PathToResource(location)
 	switch strings.ToLower(method) {
 	case "get":
 		data = WriteGetRequest(location, header)
